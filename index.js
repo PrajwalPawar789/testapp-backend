@@ -98,6 +98,13 @@ app.get('/get-intelligence', async (req, res) => {
   }
 });
 
+app.get('/api/get-typing-test', (req, res) => {
+  // Replace the example text with your actual typing test content
+  const typingTestText = "This is your typing test. Type this text accurately.";
+  res.json({ typingText: typingTestText });
+});
+
+
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
