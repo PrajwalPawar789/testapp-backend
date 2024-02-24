@@ -2,6 +2,9 @@ const express = require('express');
 const axios = require('axios');
 const multer = require('multer');
 const cors = require('cors');
+const fs = require('fs');
+const qs = require('qs');
+const fetch = require('cross-fetch');
 
 const app = express();
 const port = 3001;
@@ -17,7 +20,7 @@ app.use(cors({
 }));
 
 let authToken;
-let conversationId;
+let conversationId = ''; // Initialize conversationId variable
 
 // Set up multer for file upload
 const storage = multer.memoryStorage();
@@ -44,66 +47,87 @@ app.get('/authenticate', async (req, res) => {
   }
 });
 
-// Media route to process audio or video
-// Media route to process audio or video
-app.post('/process-media', upload.single('file'), async (req, res) => {
-  const params = {
-    'name': 'Name',
-    'languageCode': 'en-US',
-    'enableAllTrackers': true,
-  };
-
-  // Log the authToken for cross-checking
-  console.log('Auth Token in /process-media:', authToken);
-
-  const mediaOption = {
-    url: 'https://api.symbl.ai/v1/process/audio',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': `audio/${req.file.mimetype.split('/')[1]}`,
-    },
-    qs: params,
-    json: true,
-  };
-
+// Process audio route
+app.post('/process-audio', upload.single('file'), async (req, res) => {
   try {
-    const response = await axios.post(mediaOption.url, req.file.buffer, {
-      headers: mediaOption.headers,
-      params: mediaOption.qs,
+    const accessToken = authToken; // Use the access token obtained during authentication
+    const symblaiParams = {
+      name: 'Use cases discovery call',
+      conversationType: 'sales',
+      features: {
+        featureList: ['insights', 'callScore']
+      },
+      metadata: {
+        salesStage: 'Discovery',
+        prospectName: 'Wayne Enterprises'
+      }
+    };
+
+    const fetchResponse = await fetch(`https://api.symbl.ai/v1/process/audio?${qs.stringify(symblaiParams)}`, {
+      method: 'POST',
+      body: req.file.buffer,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': req.file.mimetype
+      }
     });
 
-    conversationId = response.data.conversationId;
-    res.json(response.data);
+    const responseBody = await fetchResponse.json();
+    conversationId = responseBody.conversationId; // Set conversationId after processing audio
+    res.json(responseBody);
   } catch (error) {
-    console.error('Error processing media:', error.message);
+    console.error('Error processing audio:', error.message);
     res.status(error.response ? error.response.status : 500).send(error.message);
   }
 });
 
-
-// Get results of intelligence generation
-app.get('/get-intelligence', async (req, res) => {
-  const intelligenceOption = {
-    url: `https://api.symbl.ai/v1/conversations/${conversationId}/trackers`,
-    headers: { 'Authorization': `Bearer ${authToken}` },
-    json: true,
-  };
-
+// Get call score status route
+app.get('/call-score-status', async (req, res) => {
   try {
-    const response = await axios(intelligenceOption);
-    res.json(response.data);
+    const accessToken = authToken; // Use the access token obtained during authentication
+    // Ensure you have the conversationId obtained from the previous response
+    if (!conversationId) {
+      throw new Error("ConversationId is not initialized.");
+    }
+
+    const fetchResponse = await fetch(`https://api.symbl.ai/v1/conversations/${conversationId}/callscore`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    const responseBody = await fetchResponse.json();
+    res.json(responseBody);
   } catch (error) {
-    console.error('Error fetching intelligence:', error.message);
+    console.error('Error getting call score status:', error.message);
     res.status(error.response ? error.response.status : 500).send(error.message);
   }
 });
 
-app.get('/api/get-typing-test', (req, res) => {
-  // Replace the example text with your actual typing test content
-  const typingTestText = "This is your typing test. Type this text accurately.";
-  res.json({ typingText: typingTestText });
-});
+// Get call score route
+app.get('/get-call-score', async (req, res) => {
+  try {
+    const accessToken = authToken; // Use the access token obtained during authentication
+    // Ensure you have the conversationId obtained from the previous response
+    if (!conversationId) {
+      throw new Error("ConversationId is not initialized.");
+    }
 
+    const fetchResponse = await fetch(`https://api.symbl.ai/v1/conversations/${conversationId}/callscore`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    const responseBody = await fetchResponse.json();
+    res.json(responseBody);
+  } catch (error) {
+    console.error('Error getting call score:', error.message);
+    res.status(error.response ? error.response.status : 500).send(error.message);
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
